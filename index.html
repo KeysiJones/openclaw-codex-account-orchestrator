@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rodízio de contas Codex (OAuth) no OpenClaw</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --paper: #ffffff;
+      --ink: #132033;
+      --muted: #4e5f79;
+      --ok: #0d7b53;
+      --warn: #a16b00;
+      --line: #d7e2f0;
+      --accent: #1a66d9;
+      --hero1: #10243f;
+      --hero2: #1f4f8c;
+      --hero3: #1d8a6f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 380px at 90% -10%, #dff4ff 0%, transparent 65%),
+        radial-gradient(900px 420px at -10% 10%, #e8f4ff 0%, transparent 65%),
+        var(--bg);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 1150px; margin: 36px auto; padding: 0 22px 48px; }
+    .hero {
+      background: linear-gradient(135deg, var(--hero1), var(--hero2) 62%, var(--hero3));
+      color: #f4fbff;
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(13, 38, 66, 0.28);
+    }
+    h1 { margin: 8px 0; font-size: 34px; line-height: 1.2; }
+    .sub { margin: 0; color: #d5f2ff; }
+    .pill {
+      display: inline-block;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 999px;
+      padding: 5px 10px;
+      margin-right: 8px;
+    }
+    .grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(18, 43, 73, 0.07);
+    }
+    .card.full { grid-column: 1 / -1; }
+    h2 { margin: 0 0 8px; font-size: 20px; color: #10261c; }
+    h3 { margin: 12px 0 6px; font-size: 16px; color: #0f3a2a; }
+    ul { margin: 8px 0 0 18px; }
+    li { margin: 6px 0; }
+    code {
+      background: #eaf1fb;
+      color: #10263f;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-weight: 600;
+    }
+    pre {
+      margin: 10px 0 0;
+      background: #08131e;
+      color: #f8fbff;
+      border-radius: 10px;
+      border: 1px solid #1b2a3a;
+      padding: 14px;
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.6;
+      font-weight: 600;
+    }
+    .ok { color: var(--ok); font-weight: 700; }
+    .warn { color: var(--warn); font-weight: 700; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .sources { columns: 2; column-gap: 26px; }
+    .sources p { break-inside: avoid; margin: 6px 0; }
+    .small { color: var(--muted); font-size: 13px; }
+    .lead-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .lead {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #e8f4ff;
+    }
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .flow-step {
+      min-width: 210px;
+      background: #f8fbff;
+      border: 1px solid #cdddf3;
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: inset 0 0 0 1px #eef4fe;
+    }
+    .flow-step strong {
+      display: block;
+      font-size: 13px;
+      color: #11396e;
+      margin-bottom: 4px;
+    }
+    .flow-arrow {
+      color: #3f6fab;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+      .sources { columns: 1; }
+      .lead-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <span class="pill">Pesquisa técnica</span>
+      <span class="pill">OAuth (sem foco em API key)</span>
+      <h1>Rodízio de contas OpenAI Codex no OpenClaw</h1>
+      <p class="sub">Data da pesquisa: 07/03/2026. Objetivo: usar 3 contas (OAuth ChatGPT/Codex) e trocar automaticamente quando uma bater limite.</p>
+      <div class="lead-grid">
+        <div class="lead"><strong>Sem agente extra</strong><br>Funciona no agente padrão.</div>
+        <div class="lead"><strong>Sem API key</strong><br>Fluxo 100% focado em OAuth.</div>
+        <div class="lead"><strong>Operação contínua</strong><br>Failover automático + fallback.</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>Resposta curta</h2>
+        <p class="ok">Sim, é viável no OpenClaw.</p>
+        <ul>
+          <li><strong>Não precisa criar agente separado.</strong> Você pode usar o agente padrão.</li>
+          <li>O OpenClaw suporta múltiplos perfis OAuth por provider em <code>auth-profiles.json</code>.</li>
+          <li>Quando um perfil falha por limite/rate/billing, ele entra em cooldown/disabled e o runtime gira para outro perfil.</li>
+          <li>Se todos os perfis do provider falharem, ele cai para <code>agents.defaults.model.fallbacks</code>.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>O que validar antes</h2>
+        <ul>
+          <li>Use somente contas suas e autorizadas, em conformidade com os termos do OpenAI/ChatGPT.</li>
+          <li>Evite logar a mesma conta simultaneamente em muitos clientes OAuth, pois refresh token pode invalidar sessão antiga.</li>
+          <li>Não compartilhe <code>auth.json</code> / tokens.</li>
+        </ul>
+      </article>
+
+      <article class="card full">
+        <h2>Fluxo visual do rodízio</h2>
+        <div class="flow">
+          <div class="flow-step">
+            <strong>1) Sessão inicia</strong>
+            OpenClaw escolhe perfil com base em <code>auth.order</code> (ou round-robin).
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>2) Perfil fixado</strong>
+            Session stickiness: mantém o mesmo perfil enquanto estiver saudável.
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>3) Erro de limite/auth</strong>
+            Perfil entra em cooldown/disabled por janela de backoff.
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>4) Próximo perfil</strong>
+            Runtime troca automaticamente para a próxima <code>contaN</code>.
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <strong>5) Último fallback</strong>
+            Sem perfil viável? usa <code>agents.defaults.model.fallbacks</code>.
+          </div>
+        </div>
+      </article>
+
+      <article class="card full">
+        <h2>Como configurar o rodízio (OAuth Codex) no agente padrão</h2>
+
+        <h3>1) Usar o agente padrão (sem criar agente novo)</h3>
+        <p>Se você já usa o padrão, não precisa rodar comando aqui.</p>
+
+        <h3>2) Fazer login OAuth de cada conta</h3>
+        <p>Use o fluxo que você já utiliza no wizard: <code>openclaw config</code> → selecionar modelo OpenAI Codex OAuth → login na conta.</p>
+        <p>No fluxo nativo, o login costuma gravar em <code>openai-codex:default</code>. Por isso, após cada login você deve renomear para <code>contaN</code> para não sobrescrever a conta anterior.</p>
+<pre><code>openclaw config</code></pre>
+
+        <h3>3) Confirmar perfis gerados</h3>
+<pre><code>openclaw channels list --json</code></pre>
+        <p class="small">Os IDs costumam seguir <code>provider:email</code> quando o e-mail está disponível.</p>
+
+        <h3>4) Definir ordem de prioridade dos perfis</h3>
+        <p>No <code>~/.openclaw/openclaw.json</code>, configure <code>auth.order</code>:</p>
+<pre><code>{
+  auth: {
+    order: {
+      "openai-codex": [
+        "openai-codex:conta1@dominio.com",
+        "openai-codex:conta2@dominio.com",
+        "openai-codex:conta3@dominio.com"
+      ]
+    }
+  },
+  agents: {
+    defaults: {
+      model: {
+        primary: "openai-codex/gpt-5.3-codex",
+        fallbacks: ["qwen-portal/coder-model"]
+      }
+    }
+  }
+}</code></pre>
+
+        <h3>5) Comportamento em runtime (como funciona na prática)</h3>
+        <ul>
+          <li>A rotação é feita pelo runtime de auth/provider do OpenClaw, não por um agente LLM de rotação.</li>
+          <li>OpenClaw usa “session stickiness” (não alterna a cada request; fixa por sessão até reset/erro).</li>
+          <li>Erros de limite/rate entram em cooldown exponencial (1m, 5m, 25m, 1h cap).</li>
+          <li>Falha de billing pode marcar perfil como disabled com backoff maior (5h até 24h cap).</li>
+          <li>Quando um perfil falha, a próxima tentativa usa o próximo perfil em <code>auth.order</code>.</li>
+        </ul>
+
+        <h3>6) Forçar troca manual por sessão (quando precisar)</h3>
+<pre><code>/model openai-codex/gpt-5.3-codex@openai-codex:conta1
+/model openai-codex/gpt-5.3-codex@openai-codex:conta2</code></pre>
+        <p class="small">Sintaxe: <code>/model &lt;provider/model&gt;@&lt;profileId&gt;</code>. Para remover o pin e voltar à rotação automática, rode <code>/model</code> sem o sufixo <code>@profile</code>.</p>
+      </article>
+
+      <article class="card full">
+        <h2>Como o rodízio funciona por baixo dos panos</h2>
+        <h3>1) Fonte de perfis</h3>
+        <ul>
+          <li>Os tokens OAuth ficam no arquivo <code>~/.openclaw/agents/main/agent/auth-profiles.json</code>.</li>
+          <li>Cada conta precisa de um <code>profileId</code> único (ex.: <code>openai-codex:conta1</code>, <code>conta2</code>, <code>conta3</code>).</li>
+        </ul>
+        <h3>2) Ordem de tentativa</h3>
+        <ul>
+          <li>Se houver <code>auth.order["openai-codex"]</code>, essa ordem é seguida primeiro.</li>
+          <li>Se não houver ordem explícita, o OpenClaw usa ordem automática (round-robin com regras internas).</li>
+        </ul>
+        <h3>3) Session stickiness</h3>
+        <ul>
+          <li>O perfil escolhido fica preso à sessão para estabilidade e cache.</li>
+          <li>Não há troca em toda requisição; a troca ocorre em erro, reset de sessão ou nova sessão.</li>
+        </ul>
+        <h3>4) Falha e failover</h3>
+        <ul>
+          <li>Rate limit/auth/billing podem colocar o perfil em cooldown/disabled.</li>
+          <li>Quando isso acontece, o runtime tenta o próximo perfil da ordem.</li>
+          <li>Se nenhum perfil do provider estiver utilizável, cai em <code>fallbacks</code> de modelo/provider.</li>
+        </ul>
+      </article>
+
+      <article class="card full">
+        <h2>Automação (script pronto)</h2>
+        <p>Arquivo criado em:</p>
+        <pre><code>~/Desktop/pesquisas/rodizio-contas-codex-openclaw/openclaw-codex-account-orchestrator.sh</code></pre>
+        <p>Uso padrão (faz login OAuth e depois renomeia <code>openai-codex:default</code> para o próximo <code>contaN</code>):</p>
+        <pre><code>~/Desktop/pesquisas/rodizio-contas-codex-openclaw/openclaw-codex-account-orchestrator.sh</code></pre>
+        <p>Exemplo: se já existem <code>conta1</code> e <code>conta2</code>, o novo <code>default</code> vira <code>conta3</code>.</p>
+        <p>Menu interativo (adicionar nova conta ou encerrar):</p>
+        <pre><code>~/Desktop/pesquisas/rodizio-contas-codex-openclaw/openclaw-codex-account-orchestrator.sh --interactive</code></pre>
+        <p class="small">No menu interativo também existe a opção de trocar a conta da sessão via <code>/model ...@profile</code> por baixo dos panos.</p>
+        <p>Modo em lote (ex.: adicionar 3 contas):</p>
+        <pre><code>~/Desktop/pesquisas/rodizio-contas-codex-openclaw/openclaw-codex-account-orchestrator.sh --count 3</code></pre>
+        <h3>O que o script faz internamente</h3>
+        <ul>
+          <li>Dispara o login OAuth nativo do OpenClaw para Codex.</li>
+          <li>Lê <code>auth-profiles.json</code> do agente alvo e detecta quantas <code>contaN</code> já existem.</li>
+          <li>Renomeia automaticamente <code>openai-codex:default</code> para o próximo ID livre (<code>contaN</code>).</li>
+          <li>Atualiza referências internas (<code>profiles</code>, <code>usageStats</code>, <code>lastGood</code>) para manter consistência.</li>
+          <li>Cria backup do arquivo antes de cada alteração.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Isso já resolve seu cenário?</h2>
+        <p class="ok">Para “acabou limite da conta A, usar B e depois C”, sim.</p>
+        <ul>
+          <li>Você pode aplicar tudo no agente <code>default</code>.</li>
+          <li>A rotação entre perfis OAuth é nativa do OpenClaw.</li>
+          <li>Você controla prioridade com <code>auth.order</code>.</li>
+          <li>Pode combinar com fallback de modelo/provider.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Alternativas sem API key (se OpenAI esgotar)</h2>
+        <ul>
+          <li><strong>Qwen OAuth</strong> via plugin oficial do OpenClaw (<code>qwen-portal-auth</code>), com device-code flow.</li>
+          <li><strong>Fallback multi-provider</strong> no <code>agents.defaults.model.fallbacks</code> para manter continuidade.</li>
+          <li><strong>Conta secundária via ChatGPT switcher</strong> existe no produto ChatGPT (até 2 ativas por sessão), mas não é orquestrador automático do OpenClaw.</li>
+        </ul>
+      </article>
+
+      <article class="card full">
+        <h2>Limitações reais encontradas</h2>
+        <ul>
+          <li>O Codex CLI oficial ainda não mostra suporte nativo maduro para múltiplas contas por “perfil” no binário principal; há issue aberta pedindo isso.</li>
+          <li>No OpenClaw, esse gap é contornado com <code>auth-profiles.json</code> + rotação/failover por provider.</li>
+          <li>Se o problema for política/termo de uso da conta, rodízio técnico não corrige bloqueio de compliance.</li>
+        </ul>
+      </article>
+
+      <article class="card full">
+        <h2>Fontes (primárias)</h2>
+        <div class="sources">
+          <p><a href="https://docs.openclaw.ai/concepts/oauth" target="_blank" rel="noreferrer">OpenClaw OAuth (PKCE, perfis, storage)</a></p>
+          <p><a href="https://docs.openclaw.ai/concepts/model-failover" target="_blank" rel="noreferrer">OpenClaw Model Failover (rotação, cooldown, billing disable)</a></p>
+          <p><a href="https://docs.openclaw.ai/providers/openai" target="_blank" rel="noreferrer">OpenClaw Provider OpenAI / openai-codex</a></p>
+          <p><a href="https://docs.openclaw.ai/concepts/model-providers" target="_blank" rel="noreferrer">OpenClaw Model Providers (inclui OpenAI Codex e Qwen OAuth)</a></p>
+          <p><a href="https://docs.openclaw.ai/gateway/configuration-reference" target="_blank" rel="noreferrer">OpenClaw Config Reference (auth.profiles/order)</a></p>
+          <p><a href="https://docs.openclaw.ai/tools/slash-commands" target="_blank" rel="noreferrer">OpenClaw Slash Commands (/model com perfil)</a></p>
+          <p><a href="https://developers.openai.com/codex/auth" target="_blank" rel="noreferrer">OpenAI Codex Authentication (ChatGPT sign-in, cache, CODEX_HOME)</a></p>
+          <p><a href="https://github.com/openai/codex/issues/4432" target="_blank" rel="noreferrer">Issue Codex CLI: first-class multi-account auth</a></p>
+          <p><a href="https://help.openai.com/en/articles/20001068-use-multiple-accounts-with-account-switching" target="_blank" rel="noreferrer">OpenAI Help: account switching (ChatGPT, até 2 contas na sessão)</a></p>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
