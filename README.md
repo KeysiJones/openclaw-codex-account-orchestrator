@@ -33,12 +33,12 @@ Este projeto automatiza a gestão de contas OAuth do Codex com:
 
 Arquivo principal:
 
-- `openclaw-codex-account-orchestrator.sh`
+- `codex-orchestrator.sh`
 
 Execução padrão (menu interativo):
 
 ```bash
-./openclaw-codex-account-orchestrator.sh
+./codex-orchestrator.sh
 ```
 
 Também aceita parâmetros CLI (modo não interativo).
@@ -102,6 +102,6 @@ Remover pin manual e voltar ao comportamento automático da sessão:
 
 ## Estrutura do projeto
 
-- `openclaw-codex-account-orchestrator.sh`
+- `codex-orchestrator.sh`
 - `README.md`
 
