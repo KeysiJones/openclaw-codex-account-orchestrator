@@ -22,6 +22,7 @@ Este projeto automatiza a gestão de contas OAuth do Codex com:
 - Em geral, sessões novas usam a ordem definida em `auth.order.openai-codex`.
 - Quando uma conta/profile falha por limite/auth/billing, o runtime tenta o próximo perfil elegível.
 - Se você fizer pin manual (`/model ...@profile`), aquela sessão fica presa nesse profile até remover override.
+- Para não interromper tarefas no meio, o ideal é manter sessões em modo automático (sem pin).
 
 ## Preservação de contexto
 
@@ -45,13 +46,20 @@ Também aceita parâmetros CLI (modo não interativo).
 
 ## Menu interativo
 
-1. Adicionar nova conta (login + renomear `default -> contaN`)
-2. Trocar conta (sessão específica ou todas) via `/model ...@profile`
-3. Definir conta principal para novas sessões (mantendo rodízio)
-4. Listar contas configuradas (`openai-codex`)
-5. Mostrar conta usada por cada sessão
-6. Sincronizar config apenas (`repair-config-only`)
-7. Encerrar
+1. Definir idioma da ferramenta (English/Portuguese/Spanish)
+2. Adicionar nova conta (login + renomear `default -> contaN`)
+3. Trocar conta manualmente (sessão específica ou todas) via `/model ...@profile`
+4. Definir conta principal para novas sessões (mantendo rodízio)
+5. Listar contas configuradas (`openai-codex`)
+6. Mostrar conta usada por cada sessão
+7. Voltar para modo automático (remover pin manual de sessão/todas)
+8. Sincronizar config apenas (`repair-config-only`)
+9. Encerrar
+
+Preferência de idioma:
+
+- salva localmente em `~/.codex-orchestrator/config`
+- padrão: `en` (English)
 
 ## Fluxo recomendado para adicionar contas
 
@@ -60,6 +68,7 @@ Também aceita parâmetros CLI (modo não interativo).
 3. Deixar o script renomear `openai-codex:default` para a próxima `contaN`.
 4. Repetir para cada conta adicional.
 5. Ajustar conta principal para novas sessões quando necessário.
+6. Manter sessões sem pin manual para garantir failover automático entre contas.
 
 ## Comandos úteis do OpenClaw
 
@@ -104,4 +113,3 @@ Remover pin manual e voltar ao comportamento automático da sessão:
 
 - `codex-orchestrator.sh`
 - `README.md`
-

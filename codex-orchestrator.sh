@@ -6,11 +6,112 @@ SKIP_LOGIN=0
 COUNT=""
 INTERACTIVE=0
 REPAIR_CONFIG_ONLY=0
+OC_LANG="en"
+LANG_CONFIG_FILE="$HOME/.codex-orchestrator/config"
+
+msg() {
+  local key="$1"
+  case "${OC_LANG}:${key}" in
+    en:menu_title) echo "Menu - Codex OAuth ($AGENT_ID)" ;;
+    pt:menu_title) echo "Menu - Codex OAuth ($AGENT_ID)" ;;
+    es:menu_title) echo "Menu - Codex OAuth ($AGENT_ID)" ;;
+    en:menu_lang) echo "1) Set tool language (English/Portuguese/Spanish)" ;;
+    pt:menu_lang) echo "1) Definir idioma da ferramenta (Ingles/Portugues/Espanhol)" ;;
+    es:menu_lang) echo "1) Definir idioma de la herramienta (Ingles/Portugues/Espanol)" ;;
+    en:menu_add) echo "2) Add new account (login + rename default -> contaN)" ;;
+    pt:menu_add) echo "2) Adicionar nova conta (login + renomear default -> contaN)" ;;
+    es:menu_add) echo "2) Agregar nueva cuenta (login + renombrar default -> contaN)" ;;
+    en:menu_switch) echo "3) Switch account manually (specific session or all) via /model ...@profile" ;;
+    pt:menu_switch) echo "3) Trocar conta manualmente (sessao especifica ou todas) via /model ...@profile" ;;
+    es:menu_switch) echo "3) Cambiar cuenta manualmente (sesion especifica o todas) via /model ...@profile" ;;
+    en:menu_primary) echo "4) Set primary account for NEW sessions (keep rotation)" ;;
+    pt:menu_primary) echo "4) Definir conta principal para NOVAS sessoes (mantendo rodizio)" ;;
+    es:menu_primary) echo "4) Definir cuenta principal para NUEVAS sesiones (mantener rotacion)" ;;
+    en:menu_list) echo "5) List configured accounts (openai-codex)" ;;
+    pt:menu_list) echo "5) Listar contas configuradas (openai-codex)" ;;
+    es:menu_list) echo "5) Listar cuentas configuradas (openai-codex)" ;;
+    en:menu_sessions) echo "6) Show account used by each session" ;;
+    pt:menu_sessions) echo "6) Mostrar conta usada por cada sessao" ;;
+    es:menu_sessions) echo "6) Mostrar cuenta usada por cada sesion" ;;
+    en:menu_auto) echo "7) Return to automatic mode (remove manual pin from one/all sessions)" ;;
+    pt:menu_auto) echo "7) Voltar para modo automatico (remover pin manual de sessao/todas)" ;;
+    es:menu_auto) echo "7) Volver al modo automatico (quitar pin manual de sesion/todas)" ;;
+    en:menu_sync) echo "8) Sync config only (repair-config-only)" ;;
+    pt:menu_sync) echo "8) Sincronizar config apenas (repair-config-only)" ;;
+    es:menu_sync) echo "8) Sincronizar config solamente (repair-config-only)" ;;
+    en:menu_exit) echo "9) Exit" ;;
+    pt:menu_exit) echo "9) Encerrar" ;;
+    es:menu_exit) echo "9) Salir" ;;
+    en:menu_prompt) echo "Choose [1-9]: " ;;
+    pt:menu_prompt) echo "Escolha [1-9]: " ;;
+    es:menu_prompt) echo "Elige [1-9]: " ;;
+    en:invalid_option) echo "Invalid option." ;;
+    pt:invalid_option) echo "Opcao invalida." ;;
+    es:invalid_option) echo "Opcion invalida." ;;
+    en:closing) echo "Exiting." ;;
+    pt:closing) echo "Encerrando." ;;
+    es:closing) echo "Saliendo." ;;
+    en:lang_title) echo "Choose language:" ;;
+    pt:lang_title) echo "Escolha o idioma:" ;;
+    es:lang_title) echo "Elige el idioma:" ;;
+    en:lang_prompt) echo "Choice [1-3, ENTER=1]: " ;;
+    pt:lang_prompt) echo "Escolha [1-3, ENTER=1]: " ;;
+    es:lang_prompt) echo "Eleccion [1-3, ENTER=1]: " ;;
+    en:lang_saved) echo "Language saved. Current language:" ;;
+    pt:lang_saved) echo "Idioma salvo. Idioma atual:" ;;
+    es:lang_saved) echo "Idioma guardado. Idioma actual:" ;;
+    *) echo "$key" ;;
+  esac
+}
+
+load_language_setting() {
+  if [[ -f "$LANG_CONFIG_FILE" ]]; then
+    local v
+    v="$(sed -n 's/^language=//p' "$LANG_CONFIG_FILE" | head -n1)"
+    case "$v" in
+      en|pt|es) OC_LANG="$v" ;;
+      *) OC_LANG="en" ;;
+    esac
+  else
+    OC_LANG="en"
+    save_language_setting
+  fi
+}
+
+save_language_setting() {
+  mkdir -p "$(dirname "$LANG_CONFIG_FILE")"
+  cat > "$LANG_CONFIG_FILE" <<EOF
+language=$OC_LANG
+EOF
+}
+
+set_language_interactive() {
+  echo
+  echo "$(msg lang_title)"
+  echo "1) English"
+  echo "2) Portugues"
+  echo "3) Espanol"
+  printf "%s" "$(msg lang_prompt)"
+  local opt
+  read -r opt
+  if [[ -z "$opt" ]]; then opt=1; fi
+  case "$opt" in
+    1) OC_LANG="en" ;;
+    2) OC_LANG="pt" ;;
+    3) OC_LANG="es" ;;
+    *)
+      echo "$(msg invalid_option)"
+      return 1
+      ;;
+  esac
+  save_language_setting
+  echo "$(msg lang_saved) $OC_LANG"
+}
 
 usage() {
   cat <<'EOF'
 Uso:
-  add-codex-account.sh [--agent <id>] [--count <n>] [--interactive] [--skip-login] [--repair-config-only]
+  codex-orchestrator.sh [--agent <id>] [--count <n>] [--interactive] [--skip-login] [--repair-config-only]
 
 Fluxo:
   1) Abre o wizard nativo do OpenClaw para login OAuth do Codex
@@ -25,10 +126,10 @@ Opções:
   -h, --help        Mostra esta ajuda
 
 Exemplos:
-  add-codex-account.sh --interactive
-  add-codex-account.sh --count 2
-  add-codex-account.sh --count 1 --agent main
-  add-codex-account.sh --repair-config-only
+  codex-orchestrator.sh --interactive
+  codex-orchestrator.sh --count 2
+  codex-orchestrator.sh --count 1 --agent main
+  codex-orchestrator.sh --repair-config-only
 EOF
 }
 
@@ -405,6 +506,92 @@ NODE
   fi
 }
 
+clear_session_profile_override() {
+  local sessions=()
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && sessions+=("$line")
+  done < <("$OPENCLAW_BIN_PATH" sessions --agent "$AGENT_ID" --json 2>/dev/null | node -e '
+    const fs = require("fs");
+    const raw = fs.readFileSync(0, "utf8");
+    const j = JSON.parse(raw);
+    for (const s of (j.sessions || [])) {
+      const profile = s.authProfileOverride || "";
+      let conta = "auto";
+      const m = /^openai-codex:conta(\d+)$/.exec(profile);
+      if (m) conta = `conta${m[1]}`;
+      else if (profile) conta = profile;
+      console.log(`${s.sessionId}\t${s.modelProvider || "-"}\t${s.model || "-"}\t${s.updatedAt || 0}\t${conta}`);
+    }
+  ' 2>/dev/null || true)
+
+  if [[ ${#sessions[@]} -eq 0 ]]; then
+    echo "Nenhuma sessão encontrada para agent '$AGENT_ID'."
+    return 1
+  fi
+
+  echo
+  echo "Remover pin manual (voltar para automático):"
+  local limits_label
+  limits_label="$(get_provider_limits_label)"
+  local i
+  for ((i=0; i<${#sessions[@]} && i<8; i++)); do
+    IFS=$'\t' read -r sid prov model upd conta <<<"${sessions[$i]}"
+    printf "%d) %s | %s/%s | conta=\"%s(%s)\"\n" "$((i+1))" "$sid" "$prov" "$model" "$conta" "$limits_label"
+  done
+  echo "0) Todas as sessões listadas (${#sessions[@]})"
+  printf "Escolha a sessão [ENTER=1, 0=todas]: "
+  local sidx
+  read -r sidx
+  if [[ -z "$sidx" ]]; then sidx=1; fi
+  if [[ ! "$sidx" =~ ^[0-9]+$ ]] || (( sidx < 0 || sidx > ${#sessions[@]} )); then
+    echo "Sessão inválida."
+    return 1
+  fi
+
+  local model_ref
+  model_ref="$(get_primary_model_ref)"
+  if [[ -z "$model_ref" ]]; then
+    model_ref="openai-codex/gpt-5.3-codex"
+  fi
+
+  # /model sem @profile remove override e devolve a sessão ao comportamento automático.
+  local slash_cmd
+  slash_cmd="/model ${model_ref}"
+
+  echo
+  if (( sidx == 0 )); then
+    echo "Aplicando em TODAS as sessões:"
+    echo "  $slash_cmd"
+    local ok_count=0
+    local fail_count=0
+    local sid
+    for line in "${sessions[@]}"; do
+      IFS=$'\t' read -r sid _ _ _ _ <<<"$line"
+      if "$OPENCLAW_BIN_PATH" agent --agent "$AGENT_ID" --session-id "$sid" --message "$slash_cmd" --json >/dev/null 2>&1; then
+        ok_count=$((ok_count + 1))
+      else
+        fail_count=$((fail_count + 1))
+      fi
+    done
+    echo "Concluído: $ok_count sucesso(s), $fail_count falha(s)."
+  else
+    local session_id
+    IFS=$'\t' read -r session_id _ _ _ _ <<<"${sessions[$((sidx-1))]}"
+    echo "Aplicando na sessão:"
+    echo "  $slash_cmd"
+
+    if "$OPENCLAW_BIN_PATH" agent --agent "$AGENT_ID" --session-id "$session_id" --message "$slash_cmd" --json >/dev/null 2>&1; then
+      echo "Sessão $session_id voltou para modo automático."
+    else
+      echo "Falha ao enviar /model para a sessão."
+      echo "Execute manualmente na conversa:"
+      echo "  $slash_cmd"
+      return 1
+    fi
+  fi
+}
+
 set_primary_profile_for_new_sessions() {
   if [[ ! -f "$AUTH_FILE" ]]; then
     echo "Erro: auth store não encontrado em $AUTH_FILE" >&2
@@ -658,49 +845,59 @@ run_count_mode() {
 run_interactive_menu() {
   while true; do
     echo
-    echo "Menu - Codex OAuth ($AGENT_ID)"
-    echo "1) Adicionar nova conta (login + renomear default -> contaN)"
-    echo "2) Trocar conta (sessão específica ou todas) via /model ...@profile"
-    echo "3) Definir conta principal para novas sessões (mantendo rodízio)"
-    echo "4) Listar contas configuradas (openai-codex)"
-    echo "5) Mostrar conta usada por cada sessão"
-    echo "6) Sincronizar config apenas (repair-config-only)"
-    echo "7) Encerrar"
-    printf "Escolha [1-7]: "
+    echo "$(msg menu_title)"
+    echo "$(msg menu_lang)"
+    echo "$(msg menu_add)"
+    echo "$(msg menu_switch)"
+    echo "$(msg menu_primary)"
+    echo "$(msg menu_list)"
+    echo "$(msg menu_sessions)"
+    echo "$(msg menu_auto)"
+    echo "$(msg menu_sync)"
+    echo "$(msg menu_exit)"
+    printf "%s" "$(msg menu_prompt)"
     read -r choice
 
     case "$choice" in
       1)
-        add_one_account
+        set_language_interactive || true
         ;;
       2)
-        switch_account_via_model || true
+        add_one_account
         ;;
       3)
-        set_primary_profile_for_new_sessions || true
+        switch_account_via_model || true
         ;;
       4)
-        list_openai_codex_accounts
+        set_primary_profile_for_new_sessions || true
         ;;
       5)
-        show_session_account_mapping
+        list_openai_codex_accounts
         ;;
       6)
+        show_session_account_mapping
+        ;;
+      7)
+        clear_session_profile_override || true
+        ;;
+      8)
         sync_config_metadata
         show_profiles || true
         ;;
-      7)
-        echo "Encerrando."
+      9)
+        echo "$(msg closing)"
         break
         ;;
       *)
-        echo "Opção inválida."
+        echo "$(msg invalid_option)"
         ;;
     esac
   done
 }
 
 resolve_config_file
+
+load_language_setting
 
 if [[ -n "$COUNT" ]]; then
   run_count_mode "$COUNT"
