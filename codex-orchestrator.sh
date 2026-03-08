@@ -39,12 +39,15 @@ msg() {
     en:menu_sync) echo "8) Sync config only (repair-config-only)" ;;
     pt:menu_sync) echo "8) Sincronizar config apenas (repair-config-only)" ;;
     es:menu_sync) echo "8) Sincronizar config solamente (repair-config-only)" ;;
-    en:menu_exit) echo "9) Exit" ;;
-    pt:menu_exit) echo "9) Encerrar" ;;
-    es:menu_exit) echo "9) Salir" ;;
-    en:menu_prompt) echo "Choose [1-9]: " ;;
-    pt:menu_prompt) echo "Escolha [1-9]: " ;;
-    es:menu_prompt) echo "Elige [1-9]: " ;;
+    en:menu_new_session) echo "9) New session" ;;
+    pt:menu_new_session) echo "9) Nova sessao" ;;
+    es:menu_new_session) echo "9) Nueva sesion" ;;
+    en:menu_exit) echo "10) Exit" ;;
+    pt:menu_exit) echo "10) Encerrar" ;;
+    es:menu_exit) echo "10) Salir" ;;
+    en:menu_prompt) echo "Choose [1-10]: " ;;
+    pt:menu_prompt) echo "Escolha [1-10]: " ;;
+    es:menu_prompt) echo "Elige [1-10]: " ;;
     en:invalid_option) echo "Invalid option." ;;
     pt:invalid_option) echo "Opcao invalida." ;;
     es:invalid_option) echo "Opcion invalida." ;;
@@ -60,6 +63,18 @@ msg() {
     en:lang_saved) echo "Language saved. Current language:" ;;
     pt:lang_saved) echo "Idioma salvo. Idioma atual:" ;;
     es:lang_saved) echo "Idioma guardado. Idioma actual:" ;;
+    en:new_session_title) echo "Create new session" ;;
+    pt:new_session_title) echo "Criar nova sessao" ;;
+    es:new_session_title) echo "Crear nueva sesion" ;;
+    en:new_session_prompt) echo "Initial message [ENTER=New session]:" ;;
+    pt:new_session_prompt) echo "Mensagem inicial [ENTER=Nova sessao]:" ;;
+    es:new_session_prompt) echo "Mensaje inicial [ENTER=Nueva sesion]:" ;;
+    en:new_session_ok) echo "New session created:" ;;
+    pt:new_session_ok) echo "Nova sessao criada:" ;;
+    es:new_session_ok) echo "Nueva sesion creada:" ;;
+    en:new_session_fail) echo "Failed to create new session." ;;
+    pt:new_session_fail) echo "Falha ao criar nova sessao." ;;
+    es:new_session_fail) echo "Error al crear nueva sesion." ;;
     *) echo "$key" ;;
   esac
 }
@@ -330,23 +345,22 @@ if (!rows.length) {
 }
 for (const r of rows) {
   const conta = r.id.replace(/^openai-codex:/, '');
-  const contaPct = `"${conta}(${pct})"`;
-  const exp = r.expires ? new Date(r.expires).toISOString() : '-';
-  console.log(`- ${contaPct} | profile=${r.id} (${r.type}) expires=${exp}`);
+  const exp = r.expires ? new Date(r.expires).toISOString().slice(0, 10) : '-';
+  console.log(`- ${conta} (${pct}) | expira: ${exp}`);
 }
 NODE
 
   echo
-  echo "Ordem atual para novas sessões (ordem efetiva):"
-  local printed=0
-  while IFS= read -r line; do
-    [[ -n "$line" ]] || continue
-    echo "- $line"
-    printed=1
-  done < <("$OPENCLAW_BIN_PATH" models auth order get --provider openai-codex --agent "$AGENT_ID" --json 2>/dev/null | jq -r '.order[]?' 2>/dev/null || true)
-
-  if [[ $printed -eq 0 && -f "$CONFIG_FILE" ]]; then
-    jq -r '.auth.order["openai-codex"] // [] | .[]' "$CONFIG_FILE" 2>/dev/null | sed 's/^/- /' || true
+  local order_raw order_fmt
+  order_raw="$("$OPENCLAW_BIN_PATH" models auth order get --provider openai-codex --agent "$AGENT_ID" --json 2>/dev/null | jq -r '.order[]?' 2>/dev/null || true)"
+  if [[ -z "$order_raw" && -f "$CONFIG_FILE" ]]; then
+    order_raw="$(jq -r '.auth.order["openai-codex"] // [] | .[]' "$CONFIG_FILE" 2>/dev/null || true)"
+  fi
+  if [[ -n "$order_raw" ]]; then
+    order_fmt="$(printf '%s\n' "$order_raw" | sed 's/^openai-codex://' | awk 'NF {a[++n]=$0} END {for (i=1; i<=n; i++) printf "%s%s", a[i], (i<n ? " > " : "")}')"
+    echo "Ordem para novas sessões: $order_fmt"
+  else
+    echo "Ordem para novas sessões: (nao definida)"
   fi
 }
 
@@ -358,10 +372,17 @@ show_session_account_mapping() {
   fi
 
   echo
-  echo "Conta em uso por sessão ($AGENT_ID):"
+  echo "Conta por sessao ($AGENT_ID):"
   local limits_label
   limits_label="$(get_provider_limits_label)"
-  AVAIL_LABEL="$limits_label" jq -r '
+  echo
+  printf "%-3s %-18s %-34s %-6s %-18s %s\n" "#" "sessao" "conta (limites)" "modo" "modelo" "atualizado"
+  printf "%-3s %-18s %-34s %-6s %-18s %s\n" "---" "------------------" "----------------------------------" "------" "------------------" "---------"
+
+  local rows=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && rows+=("$line")
+  done < <(jq -r '
     to_entries[]
     | .value as $s
     | ($s.authProfileOverride // "") as $p
@@ -373,8 +394,20 @@ show_session_account_mapping() {
         else $p
         end
       ) as $conta
-    | "\($s.sessionId) | conta=\"\($conta)(" + (env.AVAIL_LABEL // "N/D") + ")\" | profile=\($s.authProfileOverride // "-") | source=\($s.authProfileOverrideSource // "-") | model=\($s.modelProvider // "-")/\($s.model // "-") | updatedAt=\($s.updatedAt // 0)"
-  ' "$sessions_file" | sort -t'|' -k5,5r
+    | (if $p == "" then "auto" else "pin" end) as $modo
+    | ($s.updatedAt // 0) as $u
+    | ($u / 1000 | floor | strftime("%Y-%m-%d %H:%M")) as $when
+    | "\($s.sessionId)\t\($conta)\t\($modo)\t\($s.model // "-")\t\($when)"
+  ' "$sessions_file" | sort -t$'\t' -k5,5r)
+
+  local idx=1 sid conta modo model updated short_sid conta_with_pct
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r sid conta modo model updated <<<"$row"
+    short_sid="${sid:0:8}...${sid: -4}"
+    conta_with_pct="${conta} (${limits_label})"
+    printf "%-3s %-18s %-34s %-6s %-18s %s\n" "$idx" "$short_sid" "$conta_with_pct" "$modo" "$model" "$updated"
+    idx=$((idx + 1))
+  done
 }
 
 switch_account_via_model() {
@@ -589,6 +622,35 @@ clear_session_profile_override() {
       echo "  $slash_cmd"
       return 1
     fi
+  fi
+}
+
+create_new_session() {
+  echo
+  echo "$(msg new_session_title)"
+  printf "%s " "$(msg new_session_prompt)"
+  local init_msg
+  read -r init_msg
+  if [[ -z "$init_msg" ]]; then
+    case "$OC_LANG" in
+      pt) init_msg="Nova sessao" ;;
+      es) init_msg="Nueva sesion" ;;
+      *) init_msg="New session" ;;
+    esac
+  fi
+
+  local new_session_id
+  new_session_id="$(node -e 'console.log(require("crypto").randomUUID())' 2>/dev/null || true)"
+  if [[ -z "$new_session_id" ]]; then
+    # Fallback sem dependencias extras.
+    new_session_id="$(date +%s)-$RANDOM-$RANDOM"
+  fi
+
+  if "$OPENCLAW_BIN_PATH" agent --agent "$AGENT_ID" --session-id "$new_session_id" --message "$init_msg" --json >/dev/null 2>&1; then
+    echo "$(msg new_session_ok) $new_session_id"
+  else
+    echo "$(msg new_session_fail)"
+    return 1
   fi
 }
 
@@ -854,6 +916,7 @@ run_interactive_menu() {
     echo "$(msg menu_sessions)"
     echo "$(msg menu_auto)"
     echo "$(msg menu_sync)"
+    echo "$(msg menu_new_session)"
     echo "$(msg menu_exit)"
     printf "%s" "$(msg menu_prompt)"
     read -r choice
@@ -885,6 +948,9 @@ run_interactive_menu() {
         show_profiles || true
         ;;
       9)
+        create_new_session || true
+        ;;
+      10)
         echo "$(msg closing)"
         break
         ;;
