@@ -39,15 +39,12 @@ msg() {
     en:menu_sync) echo "8) Sync config only (repair-config-only)" ;;
     pt:menu_sync) echo "8) Sincronizar config apenas (repair-config-only)" ;;
     es:menu_sync) echo "8) Sincronizar config solamente (repair-config-only)" ;;
-    en:menu_new_session) echo "9) New session" ;;
-    pt:menu_new_session) echo "9) Nova sessao" ;;
-    es:menu_new_session) echo "9) Nueva sesion" ;;
-    en:menu_exit) echo "10) Exit" ;;
-    pt:menu_exit) echo "10) Encerrar" ;;
-    es:menu_exit) echo "10) Salir" ;;
-    en:menu_prompt) echo "Choose [1-10]: " ;;
-    pt:menu_prompt) echo "Escolha [1-10]: " ;;
-    es:menu_prompt) echo "Elige [1-10]: " ;;
+    en:menu_exit) echo "9) Exit" ;;
+    pt:menu_exit) echo "9) Encerrar" ;;
+    es:menu_exit) echo "9) Salir" ;;
+    en:menu_prompt) echo "Choose [1-9]: " ;;
+    pt:menu_prompt) echo "Escolha [1-9]: " ;;
+    es:menu_prompt) echo "Elige [1-9]: " ;;
     en:invalid_option) echo "Invalid option." ;;
     pt:invalid_option) echo "Opcao invalida." ;;
     es:invalid_option) echo "Opcion invalida." ;;
@@ -63,18 +60,6 @@ msg() {
     en:lang_saved) echo "Language saved. Current language:" ;;
     pt:lang_saved) echo "Idioma salvo. Idioma atual:" ;;
     es:lang_saved) echo "Idioma guardado. Idioma actual:" ;;
-    en:new_session_title) echo "Create new session" ;;
-    pt:new_session_title) echo "Criar nova sessao" ;;
-    es:new_session_title) echo "Crear nueva sesion" ;;
-    en:new_session_prompt) echo "Initial message [ENTER=New session]:" ;;
-    pt:new_session_prompt) echo "Mensagem inicial [ENTER=Nova sessao]:" ;;
-    es:new_session_prompt) echo "Mensaje inicial [ENTER=Nueva sesion]:" ;;
-    en:new_session_ok) echo "New session created:" ;;
-    pt:new_session_ok) echo "Nova sessao criada:" ;;
-    es:new_session_ok) echo "Nueva sesion creada:" ;;
-    en:new_session_fail) echo "Failed to create new session." ;;
-    pt:new_session_fail) echo "Falha ao criar nova sessao." ;;
-    es:new_session_fail) echo "Error al crear nueva sesion." ;;
     *) echo "$key" ;;
   esac
 }
@@ -366,10 +351,6 @@ NODE
 
 show_session_account_mapping() {
   local sessions_file="$HOME/.openclaw/agents/$AGENT_ID/sessions/sessions.json"
-  if [[ ! -f "$sessions_file" ]]; then
-    echo "Arquivo de sessões não encontrado: $sessions_file"
-    return 0
-  fi
 
   echo
   echo "Conta por sessao ($AGENT_ID):"
@@ -380,25 +361,45 @@ show_session_account_mapping() {
   printf "%-3s %-18s %-34s %-6s %-18s %s\n" "---" "------------------" "----------------------------------" "------" "------------------" "---------"
 
   local rows=()
-  while IFS= read -r line; do
-    [[ -n "$line" ]] && rows+=("$line")
-  done < <(jq -r '
-    to_entries[]
-    | .value as $s
-    | ($s.authProfileOverride // "") as $p
-    | (
-        if ($p | test("^openai-codex:conta[0-9]+$"))
-        then ($p | sub("^openai-codex:"; ""))
-        elif ($p == "")
-        then "auto"
-        else $p
-        end
-      ) as $conta
-    | (if $p == "" then "auto" else "pin" end) as $modo
-    | ($s.updatedAt // 0) as $u
-    | ($u / 1000 | floor | strftime("%Y-%m-%d %H:%M")) as $when
-    | "\($s.sessionId)\t\($conta)\t\($modo)\t\($s.model // "-")\t\($when)"
-  ' "$sessions_file" | sort -t$'\t' -k5,5r)
+  local sessions_json
+  sessions_json="$("$OPENCLAW_BIN_PATH" sessions --agent "$AGENT_ID" --json 2>/dev/null || true)"
+  if [[ -z "$sessions_json" ]]; then
+    echo "(nenhuma sessao encontrada)"
+    return 0
+  fi
+
+  local sid model updated profile conta modo when
+  while IFS=$'\t' read -r sid model updated; do
+    [[ -n "$sid" ]] || continue
+
+    profile=""
+    if [[ -f "$sessions_file" ]]; then
+      profile="$(jq -r --arg sid "$sid" '
+        to_entries[]
+        | select(.value.sessionId == $sid)
+        | .value.authProfileOverride // ""
+      ' "$sessions_file" 2>/dev/null | head -n1 || true)"
+    fi
+
+    if [[ -z "$profile" || "$profile" == "null" ]]; then
+      conta="auto"
+      modo="auto"
+    elif [[ "$profile" =~ ^openai-codex:conta[0-9]+$ ]]; then
+      conta="${profile#openai-codex:}"
+      modo="pin"
+    else
+      conta="$profile"
+      modo="pin"
+    fi
+
+    when="$(date -r "$((updated/1000))" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$updated")"
+    rows+=("${sid}"$'\t'"${conta}"$'\t'"${modo}"$'\t'"${model}"$'\t'"${when}")
+  done < <(printf '%s' "$sessions_json" | jq -r '.sessions[]? | "\(.sessionId)\t\(.model // "-")\t\(.updatedAt // 0)"' | sort -t$'\t' -k3,3nr)
+
+  if [[ ${#rows[@]} -eq 0 ]]; then
+    echo "(nenhuma sessao encontrada)"
+    return 0
+  fi
 
   local idx=1 sid conta modo model updated short_sid conta_with_pct
   for row in "${rows[@]}"; do
@@ -622,35 +623,6 @@ clear_session_profile_override() {
       echo "  $slash_cmd"
       return 1
     fi
-  fi
-}
-
-create_new_session() {
-  echo
-  echo "$(msg new_session_title)"
-  printf "%s " "$(msg new_session_prompt)"
-  local init_msg
-  read -r init_msg
-  if [[ -z "$init_msg" ]]; then
-    case "$OC_LANG" in
-      pt) init_msg="Nova sessao" ;;
-      es) init_msg="Nueva sesion" ;;
-      *) init_msg="New session" ;;
-    esac
-  fi
-
-  local new_session_id
-  new_session_id="$(node -e 'console.log(require("crypto").randomUUID())' 2>/dev/null || true)"
-  if [[ -z "$new_session_id" ]]; then
-    # Fallback sem dependencias extras.
-    new_session_id="$(date +%s)-$RANDOM-$RANDOM"
-  fi
-
-  if "$OPENCLAW_BIN_PATH" agent --agent "$AGENT_ID" --session-id "$new_session_id" --message "$init_msg" --json >/dev/null 2>&1; then
-    echo "$(msg new_session_ok) $new_session_id"
-  else
-    echo "$(msg new_session_fail)"
-    return 1
   fi
 }
 
@@ -916,7 +888,6 @@ run_interactive_menu() {
     echo "$(msg menu_sessions)"
     echo "$(msg menu_auto)"
     echo "$(msg menu_sync)"
-    echo "$(msg menu_new_session)"
     echo "$(msg menu_exit)"
     printf "%s" "$(msg menu_prompt)"
     read -r choice
@@ -948,11 +919,10 @@ run_interactive_menu() {
         show_profiles || true
         ;;
       9)
-        create_new_session || true
-        ;;
-      10)
         echo "$(msg closing)"
         break
+        ;;
+      "")
         ;;
       *)
         echo "$(msg invalid_option)"

@@ -54,8 +54,7 @@ Também aceita parâmetros CLI (modo não interativo).
 6. Mostrar conta usada por cada sessão
 7. Voltar para modo automático (remover pin manual de sessão/todas)
 8. Sincronizar config apenas (`repair-config-only`)
-9. Nova sessão
-10. Encerrar
+9. Encerrar
 
 Preferência de idioma:
 
